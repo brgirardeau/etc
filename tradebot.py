@@ -26,7 +26,7 @@ test_mode = True
 # 0 is prod-like
 # 1 is slower
 # 2 is empty
-test_exchange_index=0
+test_exchange_index=1
 prod_exchange_hostname="production"
 
 port=25000 + (test_exchange_index if test_mode else 0)
@@ -194,15 +194,16 @@ def decide_action(exchange_state):
     # Try to take advantage of people being dumb with bonds
     if Security.BOND in book:
         bond_buys, bond_sells = book[Security.BOND]
-        best_bond_sell_p, best_bond_sell_q = bond_sells[0]
-        best_bond_buy_p, best_bond_buy_q = bond_buys[0]
+        if len(bond_sells) > 0 and len(bond_buys) > 0:
+            best_bond_sell_p, best_bond_sell_q = bond_sells[0]
+            best_bond_buy_p, best_bond_buy_q = bond_buys[0]
 
-        if best_bond_sell_p < 1000:
-            actions.append(buy(Security.BOND, best_bond_sell_p, best_bond_sell_q, exchange_state))
+            if best_bond_sell_p < 1000:
+                actions.append(buy(Security.BOND, best_bond_sell_p, best_bond_sell_q, exchange_state))
 
-        if best_bond_buy_p > 1000:
-            # return sell(Security.BOND, best_bond_buy_p, min(best_bond_buy_q, securities[Security.BOND]))
-            actions.append(sell(Security.BOND, best_bond_buy_p, best_bond_buy_q, exchange_state))
+            if best_bond_buy_p > 1000:
+                # return sell(Security.BOND, best_bond_buy_p, min(best_bond_buy_q, securities[Security.BOND]))
+                actions.append(sell(Security.BOND, best_bond_buy_p, best_bond_buy_q, exchange_state))
 
     fair_value = exchange_state.fair_value
     # print(fair_value)
@@ -210,29 +211,41 @@ def decide_action(exchange_state):
     # print(Security.AAPL in fair_value)
     # time.sleep(1)
     if (Security.AAPL in fair_value.keys() and Security.MSFT in fair_value.keys() and Security.GOOG in fair_value.keys()):
-        # time.sleep(1)
         xlk_fmv_theory = 3000 + 2 * (fair_value[Security.AAPL] - 1)  + 3 * (fair_value[Security.MSFT] - 1) + 2 * (fair_value[Security.GOOG] - 1)
         xlk_fmv_actual = fair_value[Security.XLK]
+        print(xlk_fmv_theory, xlk_fmv_actual)
+        print(fair_value)
+        # time.sleep(1)
+
         b, s = book[Security.XLK]
         if xlk_fmv_theory < xlk_fmv_actual:
             actions.append(buy(Security.XLK, xlk_fmv_theory, 1, exchange_state))
             actions.append(sell(Security.XLK, s[0] - 1, s[1]), exchange_rate)
             print("XLK")
             print(xlk_fmv_theory, s[0] - 1)
-            time.sleep(5)
-
-        # print(xlk_fmv_theory, xlk_fmv_actual)
-        # time.sleep(.5)
-        if xlk_fmv_actual - xlk_fmv_theory > 1:
-            actions.append(buy(Security.XLK, book[Security.XLK][0][0] + 1, 10, exchange_state))
-            actions.append(convert_to_components(Security.XLK, 10, exchange_state))
-            actions.append(sell(Security.BOND, book[security.BOND][1][0] - 1, 3, exchange_state))
-            actions.append(sell(Security.AAPL, book[security.AAPL][1][0] - 1, 2, exchange_state))
-            actions.append(sell(Security.MSFT, book[security.MSFT][1][0] - 1, 3, exchange_state))
-            actions.append(sell(Security.MSFT, book[security.GOOG][1][0] - 1, 2, exchange_state))
+            # time.sleep(5)
+        if xlk_fmv_theory > xlk_fmv_actual:
+            # time.sleep(1)
             print("XLK2")
             print(xlk_fmv_theory, xlk_fmv_actual)
-            time.sleep(5)
+            xlk_b, xlk_s = book[Security.XLK]
+            xlk_b_p, xlk_b_q = xlk_b[0]
+            print(xlk_b_p)
+            actions.append(buy(Security.XLK, xlk_b_p + 1, 10, exchange_state))
+            actions.append(convert_to_components(Security.XLK, 10, exchange_state))
+            b_b, b_s = book[Security.BOND]
+            b_s_p, b_s_q = b_s[0]
+            actions.append(sell(Security.BOND, b_s_p - 1, 3, exchange_state))
+            a_b, a_s = book[Security.AAPL]
+            a_s_p, a_s_q = a_s[0]
+            actions.append(sell(Security.AAPL, a_s_p - 1, 2, exchange_state))
+            m_b, m_s = book[Security.MSFT]
+            m_s_p, m_s_q = m_s[0]
+            actions.append(sell(Security.MSFT, m_s_p - 1, 3, exchange_state))
+            g_b, g_s = book[Security.GOOG]
+            g_s_p, g_s_q = g_s[0]
+            actions.append(sell(Security.GOOG, g_s_p - 1, 2, exchange_state))
+            # time.sleep(5)
 
     # Arbitrage
     if (Security.BABA in book and Security.BABZ in book):
