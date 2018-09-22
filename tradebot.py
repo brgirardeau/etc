@@ -60,6 +60,7 @@ class ExchangeState:
         self.securities = securities # { security : amount_owned }
         self.book = book # { stock : ((best_buy_price, best_buy_quantity), (best_sell_price, best_sell_quantity)) }
         self.open_stocks = []
+        self.order_ids = []
 
     def __repr__(self):
         return "Book: %s" % (self.book), "Cash %d" % (self.cash), "Securities %s" % (self.securities)
@@ -90,6 +91,28 @@ class ExchangeState:
         symbols = message["symbols"]
         for sym in symbols:
             self.securities[sym.symbol] = sym.position
+
+    def ack(self, message):
+        order_id = message["order_id"]
+        self.book
+        trades[order_id][2] = True
+
+    def reject(self, message):
+        order_id = message["order_id"]
+        error = message["error"]
+
+        
+    def fill(self, message):
+        order_id = message["order_id"]
+        symbol = message["symbol"]
+        dire = message["dir"]
+        price = message["price"]
+        size = message["size"]
+
+    def out(self, message):
+        order_id = message["order_id"]
+        self.order_ids.append((order_id, datetime.now()))
+
 
 trades = {} # {id : (trade, timestamp)}
 # ~~~~~============== MAIN LOOP ==============~~~~~
