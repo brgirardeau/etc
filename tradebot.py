@@ -115,6 +115,29 @@ class ExchangeState:
     def trade(self, message):
         trades.append(message)
 
+    def ack(self, message):
+        order_id = message["order_id"]
+        self.book
+        self.trades[order_id][2] = True
+
+    def reject(self, message):
+        order_id = message["order_id"]
+        error = message["error"]
+
+
+    def fill(self, message):
+        order_id = message["order_id"]
+        symbol = message["symbol"]
+        dire = message["dir"]
+        price = message["price"]
+        size = message["size"]
+
+    def out(self, message):
+        order_id = message["order_id"]
+        self.order_ids.append((order_id, datetime.now()))
+
+
+trades = {} # {id : (trade, timestamp)}
 # ~~~~~============== MAIN LOOP ==============~~~~~
 
 def main():
