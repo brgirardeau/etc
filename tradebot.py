@@ -54,12 +54,15 @@ class Security(Enum):
     GOOG = "GOOG"
     XLK = "XLK"
 
+
 class ExchangeState:
     def __init__(self, cash=0, securities={}, book={}):
         self.cash = cash
         self.securities = securities # { security : amount_owned }
-        self.book = book # { stock : ((best_buy_price, best_buy_quantity), (best_sell_price, best_sell_quantity)) }
+        self.book = book # { stock : ([(buy_price, q),...], [(sell_price, q),...]) }
         self.open_stocks = []
+        self.trades = {} # {id : (trade, timestamp, success)}
+        self.other_trades = [] # {"type":"trade","symbol":"SYM","price":N,"size":N}
 
     def __repr__(self):
         return "Book: %s" % (self.book), "Cash %d" % (self.cash), "Securities %s" % (self.securities)
@@ -91,7 +94,27 @@ class ExchangeState:
         for sym in symbols:
             self.securities[sym.symbol] = sym.position
 
-trades = {} # {id : (trade, timestamp)}
+    def open(self, message):
+        for sym in symbols:
+            self.open_stocks.append(sym)
+
+    def close(self, message):
+        symbols = message["symbols"]
+        for sym in symbols:
+            self.open_stocks.remove(sym)
+
+    def error(self, message):
+        return
+
+    def book(self, message):
+        symbol = message.symbol
+        buys = [(buy[0], buy[1]) for buy in message.buys]
+        sells = [(sell[0], sell[1]) for sell in message.sells]
+        self.book[symbol] = (buys, sells)
+
+    def trade(self, message):
+        trades.append(message)
+
 # ~~~~~============== MAIN LOOP ==============~~~~~
 
 def main():
@@ -120,25 +143,29 @@ def decide_action(exchange_state):
 
     # Try to take advantage of people being dumb with bonds
     if Security.BOND in book:
-        (best_bond_buy_p, best_bond_buy_q), (best_bond_sell_p, best_bond_sell_q) = book[Security.BOND]
+        bond_buys, bond_sells = book[Security.BOND]
+        best_bond_sell_p, best_bond_sell_q = bond_sells[0]
+        best_bond_buy_p, best_bond_buy_q = bond_buys[0]
+
         if best_bond_sell_p < 1000:
             return buy(Security.BOND, best_bond_sell_p, best_bond_sell_q)
 
         if best_bond_buy_p > 1000:
             # return sell(Security.BOND, best_bond_buy_p, min(best_bond_buy_q, securities[Security.BOND]))
             return sell(Security.BOND, best_bond_buy_p, best_bond_buy_q)
+
     return None
 
-def buy(security, price, quantity):
+def buy(security, price, quantity, exchange_state):
     trade_id = uuid.uuid4()
     trade = {"type": "add", "order_id": trade_id, "symbol": security, "dir": "BUY", "price": price, "size": quantity}
-    trades[trade_id] = (trade, datetime.now())
+    trades[trade_id] = (trade, datetime.now(), False)
     return trade + "\n"
 
-def sell(security, price, quantity):
+def sell(security, price, quantity, exchange_state):
     trade_id = uuid.uuid4()
     trade = {"type": "add", "order_id": trade_id, "symbol": security, "dir": "SELL", "price": price, "size": quantity}
-    trades[trade_id] = (trade, datetime.now())
+    trades[trade_id] = (trade, datetime.now(), False)
 
     return trade + "\n"
 
