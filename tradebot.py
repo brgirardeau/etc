@@ -85,6 +85,7 @@ class ExchangeState:
         elif message["type"] == "error":
             self.error(message)
         elif message["type"] == "book":
+            print("________________ASDSADASDASDASDASD_________________")
             self.book_m(message)
         elif message["type"] == "trade":
             self.trade(message)
@@ -121,7 +122,7 @@ class ExchangeState:
         buys = [(buy[0], buy[1]) for buy in message["buy"]]
         sells = [(sell[0], sell[1]) for sell in message["sell"]]
         # fair value should be right in the middle of the buy and sell price for non baskets
-        if symbol in [Security.AAPL, Security.GOOG, Security.MSFT]:
+        if (len(buys) > 0 and len(sells) > 0):
             best_buy_p, bq = buys[0]
             best_sell_p, sq = sells[0]
             self.fair_value[symbol] = (best_buy_p + best_sell_p) / 2.0
@@ -147,13 +148,12 @@ class ExchangeState:
         price = message["price"]
         size = message["size"]
         if dire == "SELL":
-            print(self.securities, symbol)
+            print(self.securities, symbol, self.fair_value)
             self.securities[symbol] -= size
-            self.cash += (price * size)
+            self.cash -= ((-1 * price * size) + self.fair_value[symbol] * size)
         elif dire == "BUY":
             self.securities[symbol] += size
-            self.cash -= (price * size)
-
+            self.cash += ((-1 * price * size) + self.fair_value[symbol] * size)
 
     def out(self, message):
         order_id = message["order_id"]
@@ -193,6 +193,7 @@ def decide_action(exchange_state):
     book = exchange_state.book
     securities = exchange_state.securities
 
+    actions = []
     # Try to take advantage of people being dumb with bonds
     if Security.BOND in book:
         bond_buys, bond_sells = book[Security.BOND]
@@ -200,11 +201,23 @@ def decide_action(exchange_state):
         best_bond_buy_p, best_bond_buy_q = bond_buys[0]
 
         if best_bond_sell_p < 1000:
-            return [buy(Security.BOND, best_bond_sell_p, best_bond_sell_q, exchange_state)]
+            actions.append(buy(Security.BOND, best_bond_sell_p, best_bond_sell_q, exchange_state))
 
         if best_bond_buy_p > 1000:
             # return sell(Security.BOND, best_bond_buy_p, min(best_bond_buy_q, securities[Security.BOND]))
-            return [sell(Security.BOND, best_bond_buy_p, best_bond_buy_q, exchange_state)]
+            actions.append(sell(Security.BOND, best_bond_buy_p, best_bond_buy_q, exchange_state))
+
+    fair_value = exchange_state.fair_value
+    if (Security.AAPL in fair_value and Security.MSFT in fair_value and Security.GOOG in fair_value):
+        xlk_fmv_theory = 3000 + 2 * (fair_value[Security.AAPL] - 1)  + 3 * (fair_value[Security.MSFT] - 1) + 2 * (fair_value[Security.GOOG] - 1)
+        xlk_fmv_actual = fair_value[Security.XLK]
+        if (xlk_fmv_actual - xlk_fmv_theory) > 10:
+            actions.append(buy(Security.XLK, book[Security.XLK][0][0] + 1, 10, exchange_state))
+            actions.append(convert_to_components(Security.XLK, 10, exchange_state))
+            actions.append(sell(Security.BOND, book[security.BOND][1][0] - 1, 3, exchange_state))
+            actions.append(sell(Security.AAPL, book[security.AAPL][1][0] - 1, 2, exchange_state))
+            actions.append(sell(Security.MSFT, book[security.MSFT][1][0] - 1, 3, exchange_state))
+            actions.append(sell(Security.MSFT, book[security.GOOG][1][0] - 1, 2, exchange_state))
 
     for symbol in book:
         if symbol in exchange_state.open_stocks:
@@ -212,10 +225,12 @@ def decide_action(exchange_state):
             if (len(buys) > 0 and len(sells) > 0):
                 bb, bq = buys[0]                # best buy
                 bs, sq = sells[0]
-                action = [buy(symbol, bb + 1, 1, exchange_state), sell(symbol, bs - 1, 1, exchange_state)]
-                return action
+                actions.append(buy(symbol, bb + 1, bq, exchange_state))
+                actions.append(sell(symbol, bs - 1, sq, exchange_state))
 
-    return None
+    if len(actions) == 0:
+        return None
+    return actions
 
 def buy(security, price, quantity, exchange_state):
     trade_id = exchange_state.tid
@@ -232,6 +247,17 @@ def sell(security, price, quantity, exchange_state):
 
     return trade
 
+def convert_to_components(security, quantity, exchange_state):
+    trade_id = exchange_state.tid
+    exchange_state.tid += 1
+    trade = {"type": "convert", "order_id": trade_id, "symbol": security, "dir": "SELL", "size": quantity}
+    exchange_state.trades[trade_id] = (trade, datetime.datetime.now(), False)
+
+def convert_from_components(security, quantity, exchange_state):
+    trade_id = exchange_state.tid
+    exchange_state.tid += 1
+    trade = {"type": "convert", "order_id": trade_id, "symbol": security, "dir": "BUY", "size": quantity}
+    exchange_state.trades[trade_id] = (trade, datetime.datetime.now(), False)
 
 
 if __name__ == "__main__":
