@@ -14,6 +14,7 @@ import json
 import uuid
 import datetime
 import time
+import math
 
 # ~~~~~============== CONFIGURATION  ==============~~~~~
 # replace REPLACEME with your team name!
@@ -211,40 +212,73 @@ def decide_action(exchange_state):
     # print(Security.AAPL in fair_value)
     # time.sleep(1)
     if (Security.AAPL in fair_value.keys() and Security.MSFT in fair_value.keys() and Security.GOOG in fair_value.keys()):
-        xlk_fmv_theory = 3000 + 2 * (fair_value[Security.AAPL] - 1)  + 3 * (fair_value[Security.MSFT] - 1) + 2 * (fair_value[Security.GOOG] - 1)
+        xlk_fmv_theory = (3000 + 2 * (fair_value[Security.AAPL] - 1)  + 3 * (fair_value[Security.MSFT] - 1) + 2 * (fair_value[Security.GOOG] - 1)) / 10.0
         xlk_fmv_actual = fair_value[Security.XLK]
         print(xlk_fmv_theory, xlk_fmv_actual)
         print(fair_value)
         # time.sleep(1)
 
-        b, s = book[Security.XLK]
-        if xlk_fmv_theory < xlk_fmv_actual:
-            actions.append(buy(Security.XLK, xlk_fmv_theory, 1, exchange_state))
-            actions.append(sell(Security.XLK, s[0] - 1, s[1]), exchange_rate)
+        xlk_b, xlk_s = book[Security.XLK]
+        xlk_b_p, xlk_b_q = xlk_b[0]
+        xlk_s_p, xlk_s_q = xlk_s[0]
+        b_b, b_s = book[Security.BOND]
+        b_s_p, b_s_q = b_s[0]
+        b_b_p, b_b_q = b_b[0]
+        a_b, a_s = book[Security.AAPL]
+        a_s_p, a_s_q = a_s[0]
+        a_b_p, a_b_q = a_b[0]
+        m_b, m_s = book[Security.MSFT]
+        m_s_p, m_s_q = m_s[0]
+        m_b_p, m_b_q = m_b[0]
+        g_b, g_s = book[Security.GOOG]
+        g_s_p, g_s_q = g_s[0]
+        g_b_p, g_b_q = g_b[0]
+
+        num_xlk_from_components = min(
+            xlk_b_q,
+            math.floor(b_b_q / 3.0) * 10,
+            math.floor(a_b_q / 2.0) * 10,
+            math.floor(m_b_q / 3.0) * 10,
+            math.floor(g_b_q / 2.0) * 10)
+
+        profit_from_selling_xlk = num_xlk_from_components * xlk_b_p
+        cost_of_converting_to_xlk = num_xlk_from_components * xlk_fmv_theory + 100
+        # print(book)
+        # print(num_xlk_from_components, profit_from_selling_xlk, cost_of_converting_to_xlk)
+        # time.sleep(5)
+        if  profit_from_selling_xlk > cost_of_converting_to_xlk:
+            # create one out of parts then sell it
+            # actions.append(buy(Security.XLK, xlk_fmv_theory, 1, exchange_state))
+            # actions.append(sell(Security.XLK, s[0] - 1, s[1]), exchange_rate)
             print("XLK")
-            print(xlk_fmv_theory, s[0] - 1)
-            # time.sleep(5)
-        if xlk_fmv_theory > xlk_fmv_actual:
+            time.sleep(1)
+            actions.append(buy(Security.BOND, b_b_p + 1, 3 * num_xlk_from_components, exchange_state))
+            actions.append(buy(Security.AAPL, a_b_p + 1, 2 * num_xlk_from_components, exchange_state))
+            actions.append(buy(Security.MSFT, m_b_p + 1, 3 * num_xlk_from_components, exchange_state))
+            actions.append(buy(Security.GOOG, g_b_p + 1, 2 * num_xlk_from_components, exchange_state))
+            actions.append(convert_from_components(Security.XLK, num_xlk_from_components, exchange_state))
+            actions.append(sell(Security.XLK, xlk_s_p - 1, num_xlk_from_components, exchange_state))
+        # if xlk_fmv_theory > xlk_fmv_actual:
             # time.sleep(1)
-            print("XLK2")
-            print(xlk_fmv_theory, xlk_fmv_actual)
-            xlk_b, xlk_s = book[Security.XLK]
-            xlk_b_p, xlk_b_q = xlk_b[0]
-            print(xlk_b_p)
-            actions.append(buy(Security.XLK, xlk_b_p + 1, 10, exchange_state))
-            actions.append(convert_to_components(Security.XLK, 10, exchange_state))
-            b_b, b_s = book[Security.BOND]
-            b_s_p, b_s_q = b_s[0]
-            actions.append(sell(Security.BOND, b_s_p - 1, 3, exchange_state))
-            a_b, a_s = book[Security.AAPL]
-            a_s_p, a_s_q = a_s[0]
-            actions.append(sell(Security.AAPL, a_s_p - 1, 2, exchange_state))
-            m_b, m_s = book[Security.MSFT]
-            m_s_p, m_s_q = m_s[0]
-            actions.append(sell(Security.MSFT, m_s_p - 1, 3, exchange_state))
-            g_b, g_s = book[Security.GOOG]
-            g_s_p, g_s_q = g_s[0]
-            actions.append(sell(Security.GOOG, g_s_p - 1, 2, exchange_state))
+            # print("XLK2")
+            # print(xlk_fmv_theory, xlk_fmv_actual)
+            # xlk_b, xlk_s = book[Security.XLK]
+            # xlk_b_p, xlk_b_q = xlk_b[0]
+            # print(xlk_b_p)
+            # actions.append(buy(Security.XLK, xlk_b_p + 1, 10, exchange_state))
+            # actions.append(convert_to_components(Security.XLK, 10, exchange_state))
+            # b_b, b_s = book[Security.BOND]
+            # b_s_p, b_s_q = b_s[0]
+            # actions.append(sell(Security.BOND, b_s_p - 1, 3, exchange_state))
+            # a_b, a_s = book[Security.AAPL]
+            # a_s_p, a_s_q = a_s[0]
+            # actions.append(sell(Security.AAPL, a_s_p - 1, 2, exchange_state))
+            # m_b, m_s = book[Security.MSFT]
+            # m_s_p, m_s_q = m_s[0]
+            # actions.append(sell(Security.MSFT, m_s_p - 1, 3, exchange_state))
+            # g_b, g_s = book[Security.GOOG]
+            # g_s_p, g_s_q = g_s[0]
+            # actions.append(sell(Security.GOOG, g_s_p - 1, 2, exchange_state))
             # time.sleep(5)
 
     # Arbitrage
