@@ -45,7 +45,7 @@ def read_from_exchange(exchange):
     return json.loads(exchange.readline())
 
 # ~~~~~============== HELPFUL CLASS STUFF ==============~~~~~
-class Security(Enum):
+class Security:
     BOND = "BOND"
     BABZ = "BABZ"
     BABA = "BABA"
@@ -85,7 +85,6 @@ class ExchangeState:
         elif message["type"] == "error":
             self.error(message)
         elif message["type"] == "book":
-            print("________________ASDSADASDASDASDASD_________________")
             self.book_m(message)
         elif message["type"] == "trade":
             self.trade(message)
@@ -111,8 +110,6 @@ class ExchangeState:
 
     def close(self, message):
         symbols = message["symbols"]
-        for sym in symbols:
-            self.open_stocks.remove(sym)
 
     def error(self, message):
         return
@@ -187,7 +184,7 @@ def main():
         print(exchange_state.securities)
         print(exchange_state.cash)
         print("---------------------------")
-        time.sleep(.1)
+        time.sleep(.05)
 
 def decide_action(exchange_state):
     book = exchange_state.book
@@ -208,25 +205,77 @@ def decide_action(exchange_state):
             actions.append(sell(Security.BOND, best_bond_buy_p, best_bond_buy_q, exchange_state))
 
     fair_value = exchange_state.fair_value
-    if (Security.AAPL in fair_value and Security.MSFT in fair_value and Security.GOOG in fair_value):
+    # print(fair_value)
+    # print(Security.AAPL)
+    # print(Security.AAPL in fair_value)
+    # time.sleep(1)
+    if (Security.AAPL in fair_value.keys() and Security.MSFT in fair_value.keys() and Security.GOOG in fair_value.keys()):
+        # time.sleep(1)
         xlk_fmv_theory = 3000 + 2 * (fair_value[Security.AAPL] - 1)  + 3 * (fair_value[Security.MSFT] - 1) + 2 * (fair_value[Security.GOOG] - 1)
         xlk_fmv_actual = fair_value[Security.XLK]
-        if (xlk_fmv_actual - xlk_fmv_theory) > 10:
+        b, s = book[Security.XLK]
+        if xlk_fmv_theory < xlk_fmv_actual:
+            actions.append(buy(Security.XLK, xlk_fmv_theory, 1, exchange_state))
+            actions.append(sell(Security.XLK, s[0] - 1, s[1]), exchange_rate)
+            print("XLK")
+            print(xlk_fmv_theory, s[0] - 1)
+            time.sleep(5)
+
+        # print(xlk_fmv_theory, xlk_fmv_actual)
+        # time.sleep(.5)
+        if xlk_fmv_actual - xlk_fmv_theory > 1:
             actions.append(buy(Security.XLK, book[Security.XLK][0][0] + 1, 10, exchange_state))
             actions.append(convert_to_components(Security.XLK, 10, exchange_state))
             actions.append(sell(Security.BOND, book[security.BOND][1][0] - 1, 3, exchange_state))
             actions.append(sell(Security.AAPL, book[security.AAPL][1][0] - 1, 2, exchange_state))
             actions.append(sell(Security.MSFT, book[security.MSFT][1][0] - 1, 3, exchange_state))
             actions.append(sell(Security.MSFT, book[security.GOOG][1][0] - 1, 2, exchange_state))
+            print("XLK2")
+            print(xlk_fmv_theory, xlk_fmv_actual)
+            time.sleep(5)
+
+    # Arbitrage
+    if (Security.BABA in book and Security.BABZ in book):
+        a_buys, a_sells = book[Security.BABA]
+        z_buys, z_sells = book[Security.BABZ]
+
+        if (len(a_buys) > 0 and len(a_sells) > 0 and len(z_buys) > 0 and len(z_sells) > 0):
+            a_b_p, a_b_q = a_buys[0]
+            a_s_p, a_s_q = a_sells[0]
+
+            z_b_p, z_b_q = z_buys[0]
+            z_s_p, z_s_q = z_sells[0]
+
+            fv_a = (a_b_p + a_s_p) / 2.0
+            fv_z = (z_b_p + z_s_p) / 2.0
+
+            z_to_a_max = min(z_b_q, a_s_q)
+            a_to_z_max = min(a_b_q, z_s_q)
+            if (z_to_a_max * z_b_p) + 10 < a_s_p * z_to_a_max:
+                actions.append(buy(Security.BABZ, z_b_p, z_to_a_max, exchange_state))
+                actions.append(convert_to_components(Security.BABZ, z_to_a_max, exchange_state))
+                actions.append(sell(Security.BABA, a_s_p, z_to_a_max, exchange_state))
+                print("Z TO A")
+                print(z_b_p, a_s_p, z_to_a_max)
+                # time.sleep(5)
+
+            if (a_to_z_max * a_b_p) + 10 < z_s_p * a_to_z_max:
+                actions.append(buy(Security.BABA, a_b_p, a_to_z_max, exchange_state))
+                actions.append(convert_to_components(Security.BABA, a_to_z_max, exchange_state))
+                actions.append(sell(Security.BABZ, z_s_p, a_to_z_max, exchange_state))
+                print("A TO Z")
+                print(a_b_p, z_s_p, a_to_z_max)
+                # time.sleep(5)
+
 
     for symbol in book:
-        if symbol in exchange_state.open_stocks:
+        if symbol in exchange_state.open_stocks and symbol == Security.XLK:# and not symbol == Security.XLK and not symbol == Security.BABA and not symbol == Security.BABZ:
             buys, sells = book[symbol]
             if (len(buys) > 0 and len(sells) > 0):
                 bb, bq = buys[0]                # best buy
                 bs, sq = sells[0]
-                actions.append(buy(symbol, bb + 1, bq, exchange_state))
-                actions.append(sell(symbol, bs - 1, sq, exchange_state))
+                actions.append(buy(symbol, bb + 1, 1, exchange_state))
+                actions.append(sell(symbol, bs - 1, 1, exchange_state))
 
     if len(actions) == 0:
         return None
@@ -252,13 +301,14 @@ def convert_to_components(security, quantity, exchange_state):
     exchange_state.tid += 1
     trade = {"type": "convert", "order_id": trade_id, "symbol": security, "dir": "SELL", "size": quantity}
     exchange_state.trades[trade_id] = (trade, datetime.datetime.now(), False)
+    return trade
 
 def convert_from_components(security, quantity, exchange_state):
     trade_id = exchange_state.tid
     exchange_state.tid += 1
     trade = {"type": "convert", "order_id": trade_id, "symbol": security, "dir": "BUY", "size": quantity}
     exchange_state.trades[trade_id] = (trade, datetime.datetime.now(), False)
-
+    return trade
 
 if __name__ == "__main__":
     main()
