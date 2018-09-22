@@ -236,10 +236,10 @@ def decide_action(exchange_state):
 
         num_xlk_from_components = min(
             xlk_b_q,
-            math.floor(b_b_q / 3.0) * 10,
-            math.floor(a_b_q / 2.0) * 10,
-            math.floor(m_b_q / 3.0) * 10,
-            math.floor(g_b_q / 2.0) * 10)
+            math.floor(b_s_q / 3.0) * 10,
+            math.floor(a_s_q / 2.0) * 10,
+            math.floor(m_s_q / 3.0) * 10,
+            math.floor(g_s_q / 2.0) * 10)
 
         profit_from_selling_xlk = num_xlk_from_components * xlk_b_p
         cost_of_converting_to_xlk = num_xlk_from_components * xlk_fmv_theory + 100
@@ -258,28 +258,26 @@ def decide_action(exchange_state):
             actions.append(buy(Security.GOOG, g_b_p + 1, 2 * num_xlk_from_components, exchange_state))
             actions.append(convert_from_components(Security.XLK, num_xlk_from_components, exchange_state))
             actions.append(sell(Security.XLK, xlk_s_p - 1, num_xlk_from_components, exchange_state))
-        # if xlk_fmv_theory > xlk_fmv_actual:
-            # time.sleep(1)
-            # print("XLK2")
-            # print(xlk_fmv_theory, xlk_fmv_actual)
-            # xlk_b, xlk_s = book[Security.XLK]
-            # xlk_b_p, xlk_b_q = xlk_b[0]
-            # print(xlk_b_p)
-            # actions.append(buy(Security.XLK, xlk_b_p + 1, 10, exchange_state))
-            # actions.append(convert_to_components(Security.XLK, 10, exchange_state))
-            # b_b, b_s = book[Security.BOND]
-            # b_s_p, b_s_q = b_s[0]
-            # actions.append(sell(Security.BOND, b_s_p - 1, 3, exchange_state))
-            # a_b, a_s = book[Security.AAPL]
-            # a_s_p, a_s_q = a_s[0]
-            # actions.append(sell(Security.AAPL, a_s_p - 1, 2, exchange_state))
-            # m_b, m_s = book[Security.MSFT]
-            # m_s_p, m_s_q = m_s[0]
-            # actions.append(sell(Security.MSFT, m_s_p - 1, 3, exchange_state))
-            # g_b, g_s = book[Security.GOOG]
-            # g_s_p, g_s_q = g_s[0]
-            # actions.append(sell(Security.GOOG, g_s_p - 1, 2, exchange_state))
-            # time.sleep(5)
+
+        num_components_from_xlk = min(
+            xlk_s_q,
+            math.floor(b_b_q / 3.0) * 10,
+            math.floor(a_b_q / 2.0) * 10,
+            math.floor(m_b_q / 3.0) * 10,
+            math.floor(g_b_q / 2.0) * 10)
+
+        profit_from_selling_one_xlk_components = fair_value[Security.BOND] * 3 + fair_value[Security.AAPL] * 2 + fair_value[Security.MSFT] *  3 + fair_value[Security.GOOG] * 2
+        profit_from_selling_components = num_components_from_xlk * profit_from_selling_one_xlk_components
+        cost_of_buying_xlk_and_converting_to_components = 100 + fair_value[Security.XLK] * num_xlk_from_components
+        if cost_of_buying_xlk_and_converting_to_components < profit_from_selling_components:
+            print("XLK2")
+            time.sleep(1)
+            actions.append(buy(Security.XLK, xlk_b_p + 1, num_components_from_xlk, exchange_state))
+            actions.append(convert_to_components(Security.XLK, num_components_from_xlk, exchange_state))
+            actions.append(sell(Security.BOND, b_s_p - 1, 3 * num_components_from_xlk, exchange_state))
+            actions.append(sell(Security.AAPL, a_s_p - 1, 2 * num_components_from_xlk, exchange_state))
+            actions.append(sell(Security.MSFT, m_s_p - 1, 3 * num_components_from_xlk, exchange_state))
+            actions.append(sell(Security.GOOG, g_s_p - 1, 2 * num_components_from_xlk, exchange_state))
 
     # Arbitrage
     if (Security.BABA in book and Security.BABZ in book):
